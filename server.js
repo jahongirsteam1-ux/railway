@@ -8,15 +8,17 @@ const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CARDXABAR_CHANNEL_ID = Number(process.env.CARDXABAR_CHANNEL_ID);
 
-// 1. FIREBASE ADMIN PANELNI SOZLACH
+// 1. FIREBASE ADMIN PANELNI SOZLASH
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // Bu yerda private_key ichidagi yangi qator belgilarini to'g'rilaymiz
       privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined
     }),
-    databaseURL: process.env.FIREBASE_DATABASE_URL
+    // O'zgaruvchi aniq o'qilishi uchun uni shu yerning o'zida string ekanini tekshiramiz
+    databaseURL: String(process.env.FIREBASE_DATABASE_URL).trim()
   });
 }
 const db = admin.database();
