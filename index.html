@@ -2406,8 +2406,12 @@ function saveProduct() {
   renderAdminProducts();
   buildSlides();
   showToast('Mahsulot qo\'shildi ✓', '✓', 'var(--green)');
-  // Rasmlarni Firebase Storage ga yuklash
-  uploadProductImages(newProd);
+  // Rasmlar allaqachon base64 da saqlangan
+saveData();
+filterProducts();
+buildSlides();
+renderAdminProducts();
+showToast('Rasmlar saqlandi ✓', '🖼️', 'var(--green)');
 }
 
 // ===== EDIT PRODUCT =====
@@ -2439,8 +2443,8 @@ function saveEditProduct() {
     p.images = [...editProdImages];
     p.image = editProdImages[0];
     p.emoji = null;
-    // Rasmlarni darhol Firebase Storage ga yuklash
-    uploadProductImages(p);
+    // Rasmlar allaqachon base64 da saqlangan
+  saveData();
   }
   saveData();
   closeEditModal();
