@@ -1607,7 +1607,7 @@ function renderProducts(list) {
     card.dataset.id = p.id;
     card.dataset.cat = p.cat;
     card.innerHTML = `
-      <div class="prod-img">${p.image?`<img src="${p.image}" alt="${p.name}">`:p.emoji}${p.discount>0?`<span class="prod-badge">-${p.discount}%</span>`:''}
+      <div class="prod-img">${(p.image && p.image !== 'null' && p.image !== 'undefined')?`<img src="${p.image}" alt="${p.name}">`:`<span>${p.emoji||'📦'}</span>`}
         <button class="fav-btn-card ${isFav?'active':''}" onclick="toggleFav(event,${p.id})"><i class="ti ti-heart${isFav?'-filled':''}" style="color:${isFav?'var(--red)':'rgba(255,255,255,0.7)'}"></i></button>
       </div>
       <div class="prod-info">
