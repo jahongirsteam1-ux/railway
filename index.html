@@ -2387,7 +2387,7 @@ function saveProduct() {
   const newProd = {
     id: Date.now(), name, brand, price, discount, qty,
     emoji: newProdImages.length ? null : (catEmojis[cat]||'📦'),
-    image: newProdImages[0] || null,
+    image: newProdImages.length > 0 ? newProdImages[0] : null,
     images: [...newProdImages],
     cat, rating:5.0, reviews:0, desc: desc||'Yangi mahsulot.',
     specs
@@ -2773,10 +2773,11 @@ function buildSlides() {
     const theme = SLIDE_THEMES[i % SLIDE_THEMES.length];
     const priceM = (p.price/1000000).toFixed(1);
     const oldM = p.discount > 0 ? (p.price/1000000/(1-p.discount/100)).toFixed(1) : null;
-    const imgHtml = (p.images && p.images[0])
-      ? `<div class="slide-img"><img src="${p.images[0]}" alt="${p.name}"></div>`
-      : (p.image ? `<div class="slide-img"><img src="${p.image}" alt="${p.name}"></div>`
-      : `<div class="slide-img" style="font-size:72px">${p.emoji}</div>`);
+    const imgHtml = (p.images && p.images[0] && p.images[0] !== 'undefined')
+  ? `<div class="slide-img"><img src="${p.images[0]}" alt="${p.name}"></div>`
+  : (p.image && p.image !== 'undefined')
+  ? `<div class="slide-img"><img src="${p.image}" alt="${p.name}"></div>`
+  : `<div class="slide-img" style="font-size:72px">${p.emoji}</div>`;
 
     const slide = document.createElement('div');
     slide.className = 'slide' + (i===0?' active':'');
