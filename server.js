@@ -5,7 +5,7 @@ const TelegramBot = require('node-telegram-bot-api'); // Telegram bot kutubxonas
 
 // 1. Bot sozlamalari
 // BotFather bergan TOKENni mana shu yerga qo'shtirnoq ichiga yozing:
-const TOKEN = 'SIZNING_BOT_TOKENINGIZ'; 
+const TOKEN = '8981640688:AAHzpa8nLsJ0MvXifkZ9jmfzt1lzR7ISw1g'; 
 const bot = new TelegramBot(TOKEN, { polling: true });
 
 const PORT = process.env.PORT || 3000;
