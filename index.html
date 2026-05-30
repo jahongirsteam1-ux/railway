@@ -1281,17 +1281,30 @@ function saveData() {
   } catch(e) {}
 }
 
-// ===== FIREBASE: RASM YUKLASH =====
+// ===== IMGBB: RASM YUKLASH =====
+const IMGBB_API_KEY = '22ad61fa4383724f7fdcc2bd100e5d39';
+
 async function uploadImageToFirebase(base64, prodId, index) {
   try {
-    const res = await fetch(base64);
-    const blob = await res.blob();
-    const ext = blob.type.split('/')[1] || 'jpg';
-    const ref = storage.ref(`products/${prodId}/img_${index}.${ext}`);
-    await ref.put(blob);
-    return await ref.getDownloadURL();
+    const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+    const formData = new FormData();
+    formData.append('key', IMGBB_API_KEY);
+    formData.append('image', base64Data);
+    formData.append('name', 'prod_' + prodId + '_' + index);
+
+    const res = await fetch('https://api.imgbb.com/1/upload', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if(data.success) {
+      return data.data.url;
+    } else {
+      console.warn('ImgBB upload failed:', data);
+      return null;
+    }
   } catch(e) {
-    console.warn('Firebase upload error', e);
+    console.warn('ImgBB upload error:', e);
     return null;
   }
 }
@@ -2169,7 +2182,7 @@ function showFavorites() {
     const favProds = products.filter(p=>favorites.has(p.id));
     el.innerHTML = `<div class="products-grid" style="padding:0 0 20px">${favProds.map(p=>`
       <div class="prod-card" onclick="openDetail(${p.id});showTab('detail')">
-        <div class="prod-img">${p.image?`<img src="${p.image}" alt="${p.name}">`:p.emoji}${p.discount>0?`<span class="prod-badge">-${p.discount}%</span>`:''}</div>
+        <div class="prod-img">${(p.image && p.image !== 'null' && p.image !== 'undefined')?`<img src="${p.image}" alt="${p.name}">`:`<span>${p.emoji||'📦'}</span>`}${p.discount>0?`<span class="prod-badge">-${p.discount}%</span>`:''}</div>
         <div class="prod-info">
           <div class="prod-brand">${p.brand}</div>
           <div class="prod-name">${p.name}</div>
@@ -2209,7 +2222,7 @@ function renderAdminProducts() {
   }
   list.innerHTML = products.map(p=>`
     <div class="admin-prod-row">
-      <div class="admin-prod-emoji">${(p.image && p.image !== 'null' && p.image !== 'undefined')?`<img src="${p.image}" alt="">:`<span>${p.emoji||'📦'}</span>`}</div>
+      <div class="admin-prod-emoji">${(p.image && p.image !== 'null' && p.image !== 'undefined')?`<img src="${p.image}" alt="">` : `<span>${p.emoji||'📦'}</span>`}</div>
       <div class="admin-prod-info">
         <div class="admin-prod-name">${p.name}</div>
         <div class="admin-prod-meta">${p.brand} · ${(p.price/1000000).toFixed(1)}M · ${p.cat}</div>
@@ -2384,39 +2397,21 @@ async function saveProduct() {
   if(!specs.length) specs.push(['Narx',(price/1000000).toFixed(1)+'M so\'m'],['Brend',brand]);
   const catEmojis = {'Telefonlar':'📱','Kompyuterlar':'💻','Audio':'🎧','Aksessuarlar':'⌨️','Kameralar':'📷'};
 
-  // Rasmlarni Storage ga yuklash
-  let imageUrl = null;
-  let imageUrls = [];
+  const hasImages = newProdImages.length > 0;
+  const prodId = Date.now();
 
-  if(newProdImages.length > 0) {
-    showToast('Rasmlar yuklanmoqda...', '⏳', 'var(--accent)');
-    try {
-      for(let i = 0; i < newProdImages.length; i++) {
-        const base64 = newProdImages[i];
-        const res = await fetch(base64);
-        const blob = await res.blob();
-        const fileName = `products/${Date.now()}_${i}.jpg`;
-        const ref = firebase.storage().ref(fileName);
-        await ref.put(blob);
-        const url = await ref.getDownloadURL();
-        imageUrls.push(url);
-      }
-      imageUrl = imageUrls[0];
-    } catch(e) {
-      showToast('Rasm yuklashda xato!', '❌', 'var(--red)');
-    }
-  }
-
+  // Avval mahsulotni saqlash (rasmsiz)
   const newProd = {
-    id: Date.now(), name, brand, price, discount, qty,
-    emoji: newProdImages.length ? null : (catEmojis[cat]||'📦'),
-    image: imageUrl,
-    images: imageUrls,
+    id: prodId, name, brand, price, discount, qty,
+    emoji: hasImages ? null : (catEmojis[cat]||'📦'),
+    image: null,
+    images: [],
     cat, rating:5.0, reviews:0, desc: desc||'Yangi mahsulot.',
     specs
   };
 
   products.unshift(newProd);
+  const tempImages = [...newProdImages];
   newProdImages = [];
   saveData();
   closeAddModal();
@@ -2424,6 +2419,34 @@ async function saveProduct() {
   renderAdminProducts();
   buildSlides();
   showToast('Mahsulot qo\'shildi ✓', '✓', 'var(--green)');
+
+  // Rasmlarni Storage ga yuklash (background)
+  if(hasImages) {
+    showToast('Rasmlar yuklanmoqda...', '⏳', 'var(--accent)');
+    try {
+      const imageUrls = [];
+      for(let i = 0; i < tempImages.length; i++) {
+        const url = await uploadImageToFirebase(tempImages[i], prodId, i);
+        if(url) imageUrls.push(url);
+      }
+      if(imageUrls.length > 0) {
+        // Mahsulotni topib rasmlarini yangilash
+        const prod = products.find(p => p.id === prodId);
+        if(prod) {
+          prod.image = imageUrls[0];
+          prod.images = imageUrls;
+          saveData();
+          filterProducts();
+          renderAdminProducts();
+          buildSlides();
+          showToast('Rasmlar saqlandi ✓', '🖼️', 'var(--green)');
+        }
+      }
+    } catch(e) {
+      console.warn('Rasm yuklash xatosi:', e);
+      showToast('Rasm yuklashda xato!', '❌', 'var(--red)');
+    }
+  }
 }
 
 // ===== EDIT PRODUCT =====
