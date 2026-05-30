@@ -2209,7 +2209,7 @@ function renderAdminProducts() {
   }
   list.innerHTML = products.map(p=>`
     <div class="admin-prod-row">
-      <div class="admin-prod-emoji">${p.image?`<img src="${p.image}" alt="">`:p.emoji}</div>
+      <div class="admin-prod-emoji">${(p.image && p.image !== 'null' && p.image !== 'undefined')?`<img src="${p.image}" alt="">:`<span>${p.emoji||'📦'}</span>`}</div>
       <div class="admin-prod-info">
         <div class="admin-prod-name">${p.name}</div>
         <div class="admin-prod-meta">${p.brand} · ${(p.price/1000000).toFixed(1)}M · ${p.cat}</div>
