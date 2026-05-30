@@ -2372,7 +2372,7 @@ function openAddModal() {
 }
 function closeAddModal(){document.getElementById('addModal').classList.remove('open')}
 
-function saveProduct() {
+async function saveProduct() {
   const name = document.getElementById('prodName').value.trim() || 'Yangi mahsulot';
   const brand = document.getElementById('prodBrand').value.trim() || 'Brend';
   const price = parseInt(document.getElementById('prodPrice').value) || 0;
@@ -2380,18 +2380,42 @@ function saveProduct() {
   const discount = parseInt(document.getElementById('prodDiscount').value) || 0;
   const cat = document.getElementById('prodCat').value;
   const desc = document.getElementById('prodDesc').value.trim();
-  // Specs fields dan olamiz
   const specs = getSpecsFromFields();
   if(!specs.length) specs.push(['Narx',(price/1000000).toFixed(1)+'M so\'m'],['Brend',brand]);
-  const catEmojis = {'Telefonlar':'📱','Kompyuterlar':'💻','Audio':'🎧','Aksessuarlar':'⌚','Kameralar':'📷'};
+  const catEmojis = {'Telefonlar':'📱','Kompyuterlar':'💻','Audio':'🎧','Aksessuarlar':'⌨️','Kameralar':'📷'};
+
+  // Rasmlarni Storage ga yuklash
+  let imageUrl = null;
+  let imageUrls = [];
+
+  if(newProdImages.length > 0) {
+    showToast('Rasmlar yuklanmoqda...', '⏳', 'var(--accent)');
+    try {
+      for(let i = 0; i < newProdImages.length; i++) {
+        const base64 = newProdImages[i];
+        const res = await fetch(base64);
+        const blob = await res.blob();
+        const fileName = `products/${Date.now()}_${i}.jpg`;
+        const ref = firebase.storage().ref(fileName);
+        await ref.put(blob);
+        const url = await ref.getDownloadURL();
+        imageUrls.push(url);
+      }
+      imageUrl = imageUrls[0];
+    } catch(e) {
+      showToast('Rasm yuklashda xato!', '❌', 'var(--red)');
+    }
+  }
+
   const newProd = {
     id: Date.now(), name, brand, price, discount, qty,
     emoji: newProdImages.length ? null : (catEmojis[cat]||'📦'),
-    image: newProdImages.length > 0 ? newProdImages[0] : null,
-    images: [...newProdImages],
+    image: imageUrl,
+    images: imageUrls,
     cat, rating:5.0, reviews:0, desc: desc||'Yangi mahsulot.',
     specs
   };
+
   products.unshift(newProd);
   newProdImages = [];
   saveData();
@@ -2400,12 +2424,6 @@ function saveProduct() {
   renderAdminProducts();
   buildSlides();
   showToast('Mahsulot qo\'shildi ✓', '✓', 'var(--green)');
-  // Rasmlar allaqachon base64 da saqlangan
-saveData();
-filterProducts();
-buildSlides();
-renderAdminProducts();
-showToast('Rasmlar saqlandi ✓', '🖼️', 'var(--green)');
 }
 
 // ===== EDIT PRODUCT =====
