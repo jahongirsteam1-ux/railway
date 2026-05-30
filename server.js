@@ -1,15 +1,14 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const TelegramBot = require('node-telegram-bot-api');
+const { Telegraf } = require('telegraf');
 const admin = require('firebase-admin');
 
 const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const CARDXABAR_CHANNEL_ID = Number(process.env.CARDXABAR_CHANNEL_ID); // Masalan: -100...
+const CARDXABAR_CHANNEL_ID = Number(process.env.CARDXABAR_CHANNEL_ID);
 
-// 1. FIREBASE ADMIN PANELNI INIZIALIZATSIYA QILISH
-// Railway'da xavfsiz ishlash uchun Firebase maxfiy kalitlarini Environment Variables'dan olamiz
+// 1. FIREBASE ADMIN PANELNI SOZLACH
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -22,61 +21,42 @@ if (!admin.apps.length) {
 }
 const db = admin.database();
 
-// 2. TELEGRAM BOTNI ISHGA TUSHIRISH
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+// 2. TELEGRAF BOTNI ISHGA TUSHIRISH
+const bot = new Telegraf(BOT_TOKEN);
 
-// 3. 1 DAN 100 GACHA UNIKAL SO'M QO'SHISH ALGORITMI
-// Foydalanuvchi buyurtma bermoqchi bo'lganda ushbu funksiya chaqiriladi
-async function generateUniqueAmount(baseAmount) {
-  const ordersRef = db.ref('orders');
-  
-  // Hozirgi kunda to'lov kutayotgan (pending) barcha buyurtmalarni tekshiramiz
-  const snapshot = await ordersRef.orderByChild('status').equalTo('pending').once('value');
-  const activeOrders = snapshot.val() || {};
-  
-  const busyExtraSums = new Set();
-  for (let key in activeOrders) {
-    if (activeOrders[key].baseAmount === baseAmount) {
-      busyExtraSums.add(activeOrders[key].extraSum);
+// WebApp havolasi (GitHub Pages sahifangiz)
+const WEBAPP_URL = "https://jahongirsteam1-ux.github.io/railway/"; 
+
+// Botga /start bosilganda WebApp ochadigan tugma chiqarish
+bot.start((ctx) => {
+  ctx.reply(`⚡ TechStore do'konimizga xush kelibsiz, ${ctx.from.first_name}!`, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "🛍️ Do'konni ochish", web_app: { url: WEBAPP_URL } }]
+      ]
     }
-  }
+  });
+});
 
-  // 1 so'mdan 100 so'mgacha bo'lgan raqamlarni navbat bilan tekshiramiz
-  for (let extra = 1; extra <= 100; extra++) {
-    if (!busyExtraSums.has(extra)) {
-      return {
-        finalAmount: baseAmount + extra,
-        extraSum: extra
-      };
-    }
-  }
-  
-  // Agar 100 ta joy ham band bo'lsa (juda kam holatda), 101 dan boshlab qo'shadi
-  return { finalAmount: baseAmount + 101, extraSum: 101 };
-}
+// 3. KANALGA KELGAN CHEKNI REGEKS ORQALI TEKSHIRISH
+bot.on('channel_post', async (ctx) => {
+  if (ctx.channelPost.chat.id !== CARDXABAR_CHANNEL_ID) return;
 
-// 4. KANALGA KELGAN CHEKNI TEKSHIRISH (CardXabar Bot ulangan kanal)
-bot.on('channel_post', async (msg) => {
-  // Faqat biz belgilagan maxsus kanal xabarlarini tekshiramiz
-  if (msg.chat.id !== CARDXABAR_CHANNEL_ID) return;
-
-  const text = msg.text || msg.caption;
-  if (!text) return;
+  const text = ctx.channelPost.text || ctx.channelPost.caption;
+  if (!text || !text.includes("To'ldirish")) return;
 
   try {
-    // FAQAT "+" belgisidan keyin kelgan TUSHUM summasini qidiramiz (pastdagi Balans summasiga chalg'imaydi)
+    // FAQAT "+" belgisidan keyingi summani olamiz (Balans summasiga tegmaydi)
     const match = text.match(/\+\s*([\d\.,\s]+)\s*UZS/);
     
     if (match) {
-      // Matndagi nuqta va verfyllarni o'chirib, toza raqam holatiga keltiramiz
-      // Masalan: "300.005,00" -> 300005
-      const cleanAmountStr = match.group ? match.group(1) : match[1];
-      const incomingAmount = parseFloat(cleanAmountStr.replace(/\./g, '').replace(',', '.'));
+      const cleanAmountStr = match[1].trim().replace(/\./g, '').replace(',', '.');
+      const incomingAmount = parseFloat(cleanAmountStr);
 
-      console.log(`Kanalga yangi tushum aniqlandi: ${incomingAmount} UZS`);
+      console.log(`CardXabar kanalidan tushum keldi: ${incomingAmount} UZS`);
 
-      // Firebase'dan aynan shu jami summaga ega va kutilayotgan buyurtmani qidiramiz
       const ordersRef = db.ref('orders');
+      // Firebase'dan kutilayotgan va unikal summasi mos keladigan buyurtmani qidirish
       const snapshot = await ordersRef.orderByChild('finalAmount').equalTo(incomingAmount).once('value');
       const orders = snapshot.val();
 
@@ -84,50 +64,50 @@ bot.on('channel_post', async (msg) => {
         for (let orderId in orders) {
           if (orders[orderId].status === 'pending') {
             
-            // 1. Buyurtmani avtomatik ravishda tasdiqlangan (confirmed) holatga o'tkazamiz
+            // 1. Statusni avtomat tasdiqlaymiz
             await ordersRef.child(orderId).update({
               status: 'confirmed',
               confirmedAt: admin.database.ServerValue.TIMESTAMP
             });
 
-            console.log(`Buyurtma №${orderId} muvaffaqiyatli avtomatik tasdiqlandi!`);
+            console.log(`Buyurtma №${orderId} avtomatik tasdiqlandi!`);
 
-            // 2. Xaridorga bot orqali muvaffaqiyatli to'lov xabarini yuboramiz
+            // 2. Foydalanuvchiga botdan xabar yuboramiz
             const userId = orders[orderId].userId;
             if (userId) {
-              await bot.sendMessage(userId, `🎉 To'lovingiz qabul qilindi!\n\nBuyurtmangiz (№${orderId}) avtomatik ravishda tasdiqlandi. Tez orada mahsulot yetkaziladi.`);
+              await bot.telegram.sendMessage(userId, `🎉 To'lovingiz qabul qilindi!\n\nBuyurtmangiz (№${orderId}) muvaffaqiyatli tasdiqlandi va yetkazib berishga topshirildi.`);
             }
-            break; 
+            break;
           }
         }
-      } else {
-        console.log(`Tushum summasi (${incomingAmount}) bo'yicha hech qanday aktiv buyurtma topilmadi.`);
       }
     }
   } catch (error) {
-    console.error("Chekni tekshirishda xatolik yuz berdi:", error);
+    console.error("Chekni tekshirishda xatolik:", error);
   }
 });
 
-// WEB APP SAHIFASINI INTERNETGA CHIQARISH (Mavjud kod qismi)
-const server = http.createServer((req, res) => {
-  // Foydalanuvchi Mini App do'konini ochganda index.html yuklanadi
-  const filePath = path.join(__dirname, 'index.html');
+// Botni ishga tushirish
+bot.launch().then(() => console.log("🤖 Telegram Bot muvaffaqiyatli ishga tushdi!"));
 
+// 4. WEB APP UCHUN SERVERNIKINI SAQLAB QOLISH
+const server = http.createServer((req, res) => {
+  const filePath = path.join(__dirname, 'index.html');
   fs.readFile(filePath, (err, data) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not found');
       return;
     }
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-cache',
-    });
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(data);
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`TechStore Web Server va Bot muvaffaqiyatli ishga tushdi (Port: ${PORT})`);
+  console.log(`TechStore Web Server ${PORT}-portda ishlamoqda.`);
 });
+
+// Xavfsiz o'chirish protsedurasi
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
