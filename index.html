@@ -1269,14 +1269,8 @@ function saveData() {
   if(!db) return;
   // Mahsulotlarni rasmSIZ saqlash (rasmlar Storage da)
   const prodsToSave = products.map(p => {
-    const {images, image, ...rest} = p;
-    return {
-      ...rest,
-      image: (images && images[0] && !images[0].startsWith('data:')) ? images[0] :
-             (image && !image.startsWith('data:')) ? image : null,
-      images: (images || []).filter(u => u && !u.startsWith('data:'))
-    };
-  });
+  return { ...p };
+});
   db.ref('products').set(prodsToSave).catch(e => console.warn('FB save products', e));
   db.ref('settings/card').set({number: CARD_NUMBER, owner: CARD_OWNER}).catch(()=>{});
 
