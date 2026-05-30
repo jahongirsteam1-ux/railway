@@ -1,13 +1,14 @@
 {
   "name": "techstore",
   "version": "1.0.0",
-  "description": "TechStore Telegram Mini App with Auto Payment Verification",
+  "description": "TechStore Telegram Mini App",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.66.0",
+    "telegraf": "^4.16.3",
+    "dotenv": "^16.4.5",
     "firebase-admin": "^12.0.0"
   },
   "engines": {
