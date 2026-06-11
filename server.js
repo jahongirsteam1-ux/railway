@@ -2,11 +2,25 @@
  * TechStore — Avtomatik To'lov Tekshiruv Tizimi
  * CardXabar integratsiyasi bilan Telegraf bot
  *
- * Arxitektura:
- *  1. Express  — index.html ni serve qiladi (Mini App)
- *  2. Telegraf — foydalanuvchilarga xabar yuboradi
- *  3. Firebase — orders bazasini boshqaradi
- *  4. CardXabar listener — kanaldan tushum summasini o'qiydi
+ * Firebase orders strukturasi (index.html dan):
+ *   orderNum       : '#1042'
+ *   products       : 'iPhone 16 Pro, AirPods'   ← string
+ *   productDetails : [{id, name, brand, price, qty, image}]  ← array
+ *   total          : 18500002   ← basePrice + suffix (unique amount)
+ *   basePrice      : 18500000
+ *   suffix         : 2
+ *   addr           : 'Toshkent shahri, Yunusobod, ...'
+ *   phone          : '+998901234567'
+ *   status         : 'pending' | 'confirmed' | 'rejected'
+ *   userId         : 7505685720
+ *   userName       : 'Jahongir'
+ *   userUsername   : 'jahongir_1220'
+ *   createdAt      : 1780148210410
+ *
+ * pending_suffixes strukturasi (settings/pending_suffixes/{suffix}):
+ *   orderNum : '#1042'
+ *   userId   : 7505685720
+ *   ts       : timestamp
  */
 
 'use strict';
@@ -73,59 +87,7 @@ app.get('/health', (_req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// 4. UNIKAL SUMMA GENERATORI
-//    GET /api/unique-amount?base=300000
-// ─────────────────────────────────────────────
-app.get('/api/unique-amount', async (req, res) => {
-  try {
-    const base = parseInt(req.query.base, 10);
-
-    if (!base || base <= 0) {
-      return res.status(400).json({ error: "base parametri noto'g'ri" });
-    }
-
-    const snap = await db.ref('orders')
-      .orderByChild('status')
-      .equalTo('pending')
-      .once('value');
-
-    const orders     = snap.val() || {};
-    const usedExtras = new Set();
-
-    for (const order of Object.values(orders)) {
-      if (order.baseAmount === base && typeof order.extraSum === 'number') {
-        usedExtras.add(order.extraSum);
-      }
-    }
-
-    let extraSum = null;
-    for (let i = 1; i <= 100; i++) {
-      if (!usedExtras.has(i)) {
-        extraSum = i;
-        break;
-      }
-    }
-
-    if (extraSum === null) {
-      return res.status(503).json({
-        error: "Hozir juda ko'p buyurtma kutmoqda. Biroz kutib, qayta urinib ko'ring.",
-      });
-    }
-
-    return res.json({
-      baseAmount  : base,
-      extraSum    : extraSum,
-      finalAmount : base + extraSum,
-    });
-
-  } catch (err) {
-    console.error('unique-amount xatosi:', err);
-    return res.status(500).json({ error: 'Server xatosi' });
-  }
-});
-
-// ─────────────────────────────────────────────
-// 5. TELEGRAM BOT
+// 4. TELEGRAM BOT
 // ─────────────────────────────────────────────
 const bot = new Telegraf(BOT_TOKEN);
 
@@ -149,7 +111,6 @@ bot.help((ctx) =>
   ctx.reply('/start — Boshlash\n/menu — Do\'kon\n/help — Yordam')
 );
 
-// Boshqa xabarlar
 bot.on('message', (ctx) =>
   ctx.reply("Do'konni ochish uchun /start bosing:", Markup.inlineKeyboard([
     [Markup.button.webApp('TechStore', WEBAPP_URL)],
@@ -157,23 +118,20 @@ bot.on('message', (ctx) =>
 );
 
 // ─────────────────────────────────────────────
-// 6. CARDXABAR REGEX PARSER
+// 5. CARDXABAR REGEX PARSER
+//
+// CardXabar xabar namunasi:
+//   "To'ldirish
+//    + 18.500.002,00 UZS
+//    Balans: 5 000 000,00 UZS"
+//
+// Faqat birinchi "+" dan keyingi summani olamiz.
+// "Balans:" qatorini olmaymiz.
 // ─────────────────────────────────────────────
-
-/**
- * CardXabar xabar namunasi:
- *   "To'ldirish
- *    ...
- *    + 300.003,00 UZS
- *    Balans: 1 500 000,00 UZS"
- *
- * Faqat "+" belgisidan keyingi BIRINCHI summani olamiz.
- * "Balans:" dan keyingi raqamni olmaymiz.
- */
 const CARDXABAR_REGEX = /\+\s*([\d\s.,]+?)\s*UZS/i;
 
 /**
- * "300.003,00" yoki "300 003,00" => 300003
+ * "18.500.002,00" yoki "18 500 002,00" => 18500002
  */
 function parseAmount(raw) {
   // Verguldan keyingi tiyin qismini olib tashlash
@@ -184,14 +142,11 @@ function parseAmount(raw) {
   return isNaN(num) ? null : num;
 }
 
-/**
- * Kanal xabarini qayta ishlash
- */
 async function processChannelMessage(text) {
   if (!text) return;
 
   const match = text.match(CARDXABAR_REGEX);
-  if (!match) return; // Tushum summasi yo'q
+  if (!match) return;
 
   const rawAmount   = match[1];
   const finalAmount = parseAmount(rawAmount);
@@ -206,12 +161,18 @@ async function processChannelMessage(text) {
 }
 
 // ─────────────────────────────────────────────
-// 7. BUYURTMANI TOPIB TASDIQLASH
+// 6. BUYURTMANI TOPIB TASDIQLASH
+//
+// index.html Firebase ga 'total' fieldiga yozadi:
+//   total = basePrice + suffix  (masalan: 18500000 + 2 = 18500002)
+//
+// Shuning uchun 'total' bo'yicha qidiramiz, 'finalAmount' emas!
 // ─────────────────────────────────────────────
 async function matchAndConfirmOrder(finalAmount) {
   try {
+    // 'total' = basePrice + suffix — index.html shu fieldni yozadi
     const snap = await db.ref('orders')
-      .orderByChild('finalAmount')
+      .orderByChild('total')
       .equalTo(finalAmount)
       .once('value');
 
@@ -221,28 +182,35 @@ async function matchAndConfirmOrder(finalAmount) {
       return;
     }
 
-    // Faqat "pending" statusli birinchi buyurtmani olish
+    // Faqat 'pending' statusli birinchi buyurtmani olish
     const pendingEntry = Object.entries(orders).find(
       ([, order]) => order.status === 'pending'
     );
 
     if (!pendingEntry) {
-      console.log(`${finalAmount} UZS — buyurtma allaqachon tasdiqlangan`);
+      console.log(`${finalAmount} UZS — buyurtma allaqachon tasdiqlangan yoki topilmadi`);
       return;
     }
 
     const [orderKey, order] = pendingEntry;
 
-    // Statusni yangilash
+    // Statusni 'confirmed' ga o'zgartirish
     await db.ref(`orders/${orderKey}`).update({
       status     : 'confirmed',
       confirmedAt: admin.database.ServerValue.TIMESTAMP,
       confirmedBy: 'auto_cardxabar',
     });
 
-    console.log(`Buyurtma tasdiqlandi: ${orderKey} | ${finalAmount} UZS | user: ${order.userId}`);
+    // pending_suffixes dan bu suffixni o'chirish
+    // index.html 'suffix' fieldini ham yozadi
+    if (order.suffix != null) {
+      await db.ref(`settings/pending_suffixes/${order.suffix}`).remove();
+      console.log(`pending_suffix ${order.suffix} tozalandi`);
+    }
 
-    // Foydalanuvchiga xabar yuborish
+    console.log(`✅ Buyurtma tasdiqlandi: ${order.orderNum || orderKey} | ${finalAmount} UZS | userId: ${order.userId}`);
+
+    // Foydalanuvchiga Telegram xabari yuborish
     if (order.userId) {
       await notifyUser(order.userId, order, orderKey);
     }
@@ -253,123 +221,84 @@ async function matchAndConfirmOrder(finalAmount) {
 }
 
 // ─────────────────────────────────────────────
-// 8. FOYDALANUVCHIGA XABAR YUBORISH
+// 7. FOYDALANUVCHIGA XABAR YUBORISH
+//
+// index.html ikki formatda yozadi:
+//   products       = "iPhone 16 Pro, AirPods"  ← eski string format
+//   productDetails = [{name, price, qty, image}] ← yangi array format
+//
+// Ikkalasini ham qo'llab-quvvatlaymiz
 // ─────────────────────────────────────────────
 async function notifyUser(userId, order, orderKey) {
   try {
-    const productNames = Array.isArray(order.items)
-      ? order.items.map((i) => i.name).join(', ')
-      : (order.productName || 'Mahsulot');
+    // productDetails (yangi) yoki products (eski string) dan nomlarni olamiz
+    let productLines;
+    if (Array.isArray(order.productDetails) && order.productDetails.length) {
+      productLines = order.productDetails
+        .map(i => `• ${i.name}${i.qty > 1 ? ` x${i.qty}` : ''} — ${Number(i.price * i.qty).toLocaleString('uz-UZ')} so'm`)
+        .join('\n');
+    } else {
+      productLines = `• ${order.products || 'Mahsulot'}`;
+    }
 
-    const amountFormatted = order.finalAmount
-      ? order.finalAmount.toLocaleString('uz-UZ') + ' UZS'
-      : '';
+    // total = uniqueAmt (basePrice + suffix)
+    const totalFormatted = order.total
+      ? Number(order.total).toLocaleString('uz-UZ') + ' so\'m'
+      : '—';
+
+    const orderNum = order.orderNum || `#${orderKey}`;
 
     const message =
-      `🎉 To'lovingiz muvaffaqiyatli qabul qilindi va buyurtmangiz tasdiqlandi!\n\n` +
-      `📦 Buyurtma raqami: #${orderKey}\n` +
-      `🛒 Mahsulot: ${productNames}\n` +
-      `💰 Summa: ${amountFormatted}\n\n` +
-      `🚀 Admin siz bilan tez orada bog'lanadi va mahsulot yetkazib beriladi!\n\n` +
+      `🎉 To'lovingiz tasdiqlandi!\n\n` +
+      `📦 Buyurtma: ${orderNum}\n` +
+      `🛒 Mahsulotlar:\n${productLines}\n` +
+      `💰 Jami: ${totalFormatted}\n` +
+      `📍 Manzil: ${order.addr || '—'}\n` +
+      `📞 Telefon: ${order.phone || '—'}\n\n` +
+      `🚀 Admin tez orada siz bilan bog'lanadi!\n` +
       `TechStore — Ishonchli xarid 🏆`;
 
-    await bot.telegram.sendMessage(userId, message, {
-      ...Markup.inlineKeyboard([
+    await bot.telegram.sendMessage(userId, message,
+      Markup.inlineKeyboard([
         [Markup.button.webApp("Do'konni ochish", WEBAPP_URL)],
-      ]),
-    });
+      ])
+    );
 
-    console.log(`Foydalanuvchiga xabar yuborildi: ${userId}`);
+    console.log(`📨 Xabar yuborildi: userId=${userId}, order=${orderNum}`);
 
   } catch (err) {
-    // Foydalanuvchi botni bloklagan bo'lishi mumkin
+    // Foydalanuvchi botni bloklagan yoki boshqa xato
     console.warn(`Xabar yuborishda xato (userId: ${userId}):`, err.message);
   }
 }
 
 // ─────────────────────────────────────────────
-// 9. KANAL XABARLARINI USHLASH
-//    channel_post — kanal xabarlari uchun alohida handler
+// 8. KANAL XABARLARINI USHLASH
+//    Bot CardXabar kanalining admini bo'lishi KERAK
+//    yoki kanal forward xabarlarini o'qiydi
 // ─────────────────────────────────────────────
 bot.on('channel_post', async (ctx) => {
-  const post = ctx.channelPost;
-
-  // Faqat bizning CardXabar kanalidan
+  const post      = ctx.channelPost;
   const channelId = String(post.chat.id);
   const targetId  = String(CARDXABAR_CHANNEL_ID);
 
+  // Faqat bizning CardXabar kanalidan kelgan xabarlar
   if (channelId !== targetId) return;
 
   const text = post.text || post.caption || '';
-  console.log(`Kanal xabari [${channelId}]:`, text.substring(0, 100));
+  console.log(`📩 Kanal xabari [${channelId}]:`, text.substring(0, 120));
 
   await processChannelMessage(text);
 });
 
 // ─────────────────────────────────────────────
-// 10. QO'SHIMCHA API ENDPOINTLAR
-// ─────────────────────────────────────────────
-
-// POST /api/orders — Frontend dan buyurtma yaratish
-app.post('/api/orders', async (req, res) => {
-  try {
-    const { userId, items, baseAmount, extraSum, finalAmount, phone, address } = req.body;
-
-    if (!userId || !baseAmount || !finalAmount) {
-      return res.status(400).json({ error: "Majburiy maydonlar to'ldirilmagan" });
-    }
-
-    const orderRef = db.ref('orders').push();
-    await orderRef.set({
-      userId,
-      items       : items    || [],
-      baseAmount,
-      extraSum    : extraSum || 0,
-      finalAmount,
-      phone       : phone    || '',
-      address     : address  || '',
-      status      : 'pending',
-      createdAt   : admin.database.ServerValue.TIMESTAMP,
-      confirmedAt : null,
-      confirmedBy : null,
-    });
-
-    return res.json({ success: true, orderKey: orderRef.key });
-
-  } catch (err) {
-    console.error('POST /api/orders xatosi:', err);
-    return res.status(500).json({ error: 'Server xatosi' });
-  }
-});
-
-// GET /api/orders/:orderKey — Buyurtma statusini tekshirish
-app.get('/api/orders/:orderKey', async (req, res) => {
-  try {
-    const snap  = await db.ref(`orders/${req.params.orderKey}`).once('value');
-    const order = snap.val();
-
-    if (!order) {
-      return res.status(404).json({ error: 'Buyurtma topilmadi' });
-    }
-
-    // userId ni yashirish
-    const { userId: _hidden, ...safeOrder } = order;
-    return res.json(safeOrder);
-
-  } catch (err) {
-    console.error('GET /api/orders xatosi:', err);
-    return res.status(500).json({ error: 'Server xatosi' });
-  }
-});
-
-// ─────────────────────────────────────────────
-// 11. SERVER ISHGA TUSHIRISH
+// 9. SERVER ISHGA TUSHIRISH
 // ─────────────────────────────────────────────
 app.listen(PORT, async () => {
   console.log('='.repeat(50));
   console.log(`Express server: http://localhost:${PORT}`);
   console.log(`Mini App URL  : ${WEBAPP_URL}`);
-  console.log(`CardXabar kanal: ${CARDXABAR_CHANNEL_ID}`);
+  console.log(`CardXabar ID  : ${CARDXABAR_CHANNEL_ID}`);
   console.log('='.repeat(50));
 
   try {
@@ -377,7 +306,7 @@ app.listen(PORT, async () => {
     console.log(`Bot ulandi: @${botInfo.username} (id: ${botInfo.id})`);
 
     await bot.launch({ dropPendingUpdates: true });
-    console.log('Bot polling boshlandi — CardXabar kanalini tinglayapman...');
+    console.log('✅ Bot polling boshlandi — CardXabar kanalini tinglayapman...');
 
   } catch (err) {
     console.error('Bot ishga tushmadi:', err.message);
