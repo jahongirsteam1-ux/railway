@@ -1200,6 +1200,7 @@ function loadTelegramUser() {
     }
 
     // Firebase ga foydalanuvchini saqlash (admin ko'rsin)
+    if(db) {
     const userRef = db.ref(`users/${user.id}`);
     userRef.once('value', snap => {
       const existing = snap.val();
@@ -1222,6 +1223,32 @@ function loadTelegramUser() {
       }
       userRef.set(userData).catch(()=>{});
     });
+    } else {
+      onFirebaseReady(() => {
+        const userRef = db.ref(`users/${user.id}`);
+        userRef.once('value', snap => {
+          const existing = snap.val();
+          const userData = {
+            id: user.id,
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            username: user.username || '',
+            photo_url: user.photo_url || '',
+            lastSeen: new Date().toISOString(),
+          };
+          if(existing) {
+            userData.orderCount = existing.orderCount || 0;
+            userData.phone = existing.phone || '';
+            userData.joinedAt = existing.joinedAt || new Date().toISOString();
+          } else {
+            userData.orderCount = 0;
+            userData.phone = '';
+            userData.joinedAt = new Date().toISOString();
+          }
+          userRef.set(userData).catch(()=>{});
+        });
+      });
+    }
   } else {
     // Browser test mode fallback
     avatarEl.textContent = 'A';
@@ -1250,18 +1277,40 @@ const firebaseConfig = {
   appId: "1:456809138926:web:d4a855263760cb921a81ff"
 };
 let db, storage;
+let _firebaseReady = false;
+let _firebaseCallbacks = [];
+
+function onFirebaseReady(cb) {
+  if(_firebaseReady && db) { cb(); return; }
+  _firebaseCallbacks.push(cb);
+}
+
 function initFirebase() {
-  if(db) return; // already initialized
-  if(typeof firebase === 'undefined') { console.error('Firebase SDK yuklanmadi'); return; }
+  if(db) return;
+  if(typeof firebase === 'undefined') {
+    console.error('Firebase SDK yuklanmadi');
+    return;
+  }
   if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   db = firebase.database();
   storage = firebase.storage();
+  _firebaseReady = true;
+  _firebaseCallbacks.forEach(cb => { try{ cb(); }catch(e){} });
+  _firebaseCallbacks = [];
 }
 
 // ===== FIREBASE: MA'LUMOT SAQLASH =====
 function saveData() {
   initFirebase();
-  if(!db) return;
+  if(!db) {
+    onFirebaseReady(() => saveData());
+    // Cart/favorites ni localStorage ga saqlaymiz (Firebase bo'lmasa ham)
+    try {
+      localStorage.setItem('ts_cart', JSON.stringify(cart));
+      localStorage.setItem('ts_favorites', JSON.stringify([...favorites]));
+    } catch(e) {}
+    return;
+  }
   // Mahsulotlarni rasmSIZ saqlash (rasmlar Storage da)
   const prodsToSave = products.map(p => {
   return { ...p };
@@ -1330,7 +1379,11 @@ async function uploadProductImages(prod) {
 // ===== FIREBASE: MA'LUMOT YUKLASH =====
 function loadData() {
   initFirebase();
-  if(!db) { console.error('Firebase ishga tushmadi'); return; }
+  if(!db) {
+    // Firebase hali tayyorlanmadi — keyinroq urinish
+    onFirebaseReady(() => loadData());
+    return;
+  }
 
   // localStorage dan foydalanuvchi ma'lumotlari
   try {
@@ -3131,34 +3184,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const obs = new MutationObserver(() => applyIconFallback());
   obs.observe(document.body, { childList:true, subtree:true });
 
-  // ===== INIT =====
-  loadData();
-  loadTelegramUser();
+  // SVG va UI ni darhol ko'rsatamiz
   renderProducts(products);
   renderCart();
   updateCartBadge();
   updateProfileCounts();
   updatePaymentCard();
   buildSlides();
-  loadAdminOrders();
+
+  // Firebase tayyorlanganidan keyin ma'lumot yuklaymiz
+  // window.load kutmaymiz — DOMContentLoaded da inline script bajarilgan, Firebase SDK keldi
+  function tryInit() {
+    if(typeof firebase !== 'undefined') {
+      initFirebase();
+      loadData();
+      loadTelegramUser();
+      loadAdminOrders();
+    } else {
+      // SDK hali yuklanmadi — biroz kutamiz
+      setTimeout(tryInit, 100);
+    }
+  }
+  tryInit();
 });
 </script>
-</div> <script>
-        // 1. Telegram Web App ni ishga tushirish
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-
-        // 2. Firebase ni ulash (Konfiguratsiyani o'z bazangizdan oling)
-        const firebaseConfig = {
-            apiKey: "SIZNING_API_KEY",
-            databaseURL: "SIZNING_DATABASE_URL",
-            projectId: "SIZNING_PROJECT_ID",
-            storageBucket: "SIZNING_STORAGE_BUCKET"
-        };
-        firebase.initializeApp(firebaseConfig);
-        
-        console.log("TechStore yuklandi!");
-    </script>
-</body>
-</html>
