@@ -3143,3 +3143,22 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAdminOrders();
 });
 </script>
+</div> <script>
+        // 1. Telegram Web App ni ishga tushirish
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // 2. Firebase ni ulash (Konfiguratsiyani o'z bazangizdan oling)
+        const firebaseConfig = {
+            apiKey: "SIZNING_API_KEY",
+            databaseURL: "SIZNING_DATABASE_URL",
+            projectId: "SIZNING_PROJECT_ID",
+            storageBucket: "SIZNING_STORAGE_BUCKET"
+        };
+        firebase.initializeApp(firebaseConfig);
+        
+        console.log("TechStore yuklandi!");
+    </script>
+</body>
+</html>
