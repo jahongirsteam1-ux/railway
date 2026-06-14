@@ -90,7 +90,7 @@ body{
 .slide.active{opacity:1;transform:translateX(0);pointer-events:auto}
 .slide.exit{opacity:0;transform:translateX(-60px)}
 .slide-bg{position:absolute;inset:0;z-index:0}
-.slide-text{z-index:2;flex:1;position:relative}
+.slide-text{z-index:2;flex:1;position:relative;padding-right:90px}
 .slide-badge{display:inline-block;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:600;margin-bottom:8px;backdrop-filter:blur(8px)}
 .slide-title{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:5px}
 .slide-price{font-size:13px;font-weight:700;margin-bottom:10px}
@@ -326,13 +326,23 @@ body{
   background:rgba(255,255,255,0.06);
   transition:all 0.2s;
 }
-.admin-tab.active{
-  background:rgba(107,127,255,0.15);
-  border-color:rgba(107,127,255,0.4);
-  color:var(--accent);
-  box-shadow:0 0 20px rgba(107,127,255,0.2);
-}
-.admin-tab.active .tab-icon{background:rgba(107,127,255,0.2);box-shadow:0 0 12px rgba(107,127,255,0.4)}
+.admin-tab:nth-child(1) .tab-icon { color: #60a5fa; background: rgba(59,130,246,0.1) }
+.admin-tab:nth-child(2) .tab-icon { color: #FBBF24; background: rgba(251,191,36,0.1) }
+.admin-tab:nth-child(3) .tab-icon { color: #34D399; background: rgba(52,211,153,0.1) }
+.admin-tab:nth-child(4) .tab-icon { color: #A78BFA; background: rgba(167,139,250,0.1) }
+.admin-tab:nth-child(5) .tab-icon { color: #F87171; background: rgba(248,113,113,0.1) }
+
+.admin-tab.active:nth-child(1) { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.4); color: #60a5fa; box-shadow: 0 0 20px rgba(59,130,246,0.2) }
+.admin-tab.active:nth-child(2) { background: rgba(251,191,36,0.15); border-color: rgba(251,191,36,0.4); color: #FBBF24; box-shadow: 0 0 20px rgba(251,191,36,0.2) }
+.admin-tab.active:nth-child(3) { background: rgba(52,211,153,0.15); border-color: rgba(52,211,153,0.4); color: #34D399; box-shadow: 0 0 20px rgba(52,211,153,0.2) }
+.admin-tab.active:nth-child(4) { background: rgba(167,139,250,0.15); border-color: rgba(167,139,250,0.4); color: #A78BFA; box-shadow: 0 0 20px rgba(167,139,250,0.2) }
+.admin-tab.active:nth-child(5) { background: rgba(248,113,113,0.15); border-color: rgba(248,113,113,0.4); color: #F87171; box-shadow: 0 0 20px rgba(248,113,113,0.2) }
+
+.admin-tab.active:nth-child(1) .tab-icon { background: rgba(59,130,246,0.25); box-shadow: 0 0 12px rgba(59,130,246,0.4) }
+.admin-tab.active:nth-child(2) .tab-icon { background: rgba(251,191,36,0.25); box-shadow: 0 0 12px rgba(251,191,36,0.4) }
+.admin-tab.active:nth-child(3) .tab-icon { background: rgba(52,211,153,0.25); box-shadow: 0 0 12px rgba(52,211,153,0.4) }
+.admin-tab.active:nth-child(4) .tab-icon { background: rgba(167,139,250,0.25); box-shadow: 0 0 12px rgba(167,139,250,0.4) }
+.admin-tab.active:nth-child(5) .tab-icon { background: rgba(248,113,113,0.25); box-shadow: 0 0 12px rgba(248,113,113,0.4) }
 .add-prod-btn{width:100%;height:48px;border-radius:16px;background:var(--grad);border:none;color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px;box-shadow:0 6px 20px rgba(107,127,255,0.35)}
 
 /* ADMIN PRODUCT LIST */
