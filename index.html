@@ -1953,9 +1953,9 @@ function renderUsersList() {
 
     const phoneHtml = u.phone
       ? `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--green)">
-           <i class="ti ti-map-pin" style="font-size:11px"></i> ${u.phone}
+           <i class="ti ti-phone" style="font-size:11px"></i> <a href="tel:${u.phone}" style="color:var(--green);text-decoration:none" onclick="event.stopPropagation()">${u.phone}</a>
          </div>`
-      : `<div style="font-size:11px;color:var(--text3)">📵 Raqam yo'q</div>`;
+      : `<div style="font-size:11px;color:var(--text3)">📵 Raqam kiritilmagan</div>`;
 
     const orderBadge = u.orderCount > 0
       ? `<span style="background:rgba(107,127,255,0.18);color:var(--accent);border:1px solid rgba(107,127,255,0.3);border-radius:8px;padding:2px 8px;font-size:10px;font-weight:700">${u.orderCount} buyurtma</span>`
@@ -2002,11 +2002,10 @@ function openTelegramAdmin() {
 
 function openTgUser(uid, uname) {
   if(uname && uname !== 'null' && uname !== 'undefined') {
-    if(tg) tg.openTelegramLink('https://t.me/' + uname);
+    if(typeof tg !== 'undefined' && tg.openTelegramLink) tg.openTelegramLink('https://t.me/' + uname);
     else window.open('https://t.me/' + uname, '_blank');
   } else {
-    if(tg) tg.openTelegramLink('tg://user?id=' + uid);
-    else window.open('tg://user?id=' + uid, '_blank');
+    window.location.href = 'tg://user?id=' + uid;
   }
 }
 
@@ -2624,11 +2623,10 @@ function openChek(name, prod, price, time, status, userId, chekImg, userUsername
 
 function openTgUserDirect(uid, uname) {
   if(uname && uname !== 'null' && uname !== 'undefined') {
-    if(tg) tg.openTelegramLink('https://t.me/' + uname);
+    if(typeof tg !== 'undefined' && tg.openTelegramLink) tg.openTelegramLink('https://t.me/' + uname);
     else window.open('https://t.me/' + uname, '_blank');
   } else {
-    if(tg) tg.openTelegramLink('tg://user?id=' + uid);
-    else window.open('tg://user?id=' + uid, '_blank');
+    window.location.href = 'tg://user?id=' + uid;
   }
 }
 
