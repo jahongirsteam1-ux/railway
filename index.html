@@ -530,10 +530,10 @@ body{
   <div class="toast" id="toast"></div>
 
   <nav class="tab-nav">
-    <button class="tab-btn active" onclick="showTab('home')"><i class="ti ti-home"></i>Asosiy</button>
-    <button class="tab-btn" onclick="showTab('cart')" style="position:relative"><i class="ti ti-shopping-cart"></i>Savat<span id="cartTabBadge" style="display:none;position:absolute;top:6px;right:18px;width:7px;height:7px;background:var(--red);border-radius:50%"></span></button>
-    <button id="adminTabBtn" class="tab-btn" onclick="showAdminTab()" style="position:relative;display:none"><i class="ti ti-layout-dashboard"></i>Admin<span class="chek-notify" id="chekNotify"></span></button>
-    <button class="tab-btn" onclick="showTab('profile')"><i class="ti ti-user"></i>Profil</button>
+    <button class="tab-btn active" data-tab="home" onclick="showTab('home')"><i class="ti ti-home"></i>Asosiy</button>
+    <button class="tab-btn" data-tab="cart" onclick="showTab('cart')" style="position:relative"><i class="ti ti-shopping-cart"></i>Savat<span id="cartTabBadge" style="display:none;position:absolute;top:6px;right:18px;width:7px;height:7px;background:var(--red);border-radius:50%"></span></button>
+    <button id="adminTabBtn" class="tab-btn" data-tab="admin" onclick="showAdminTab()" style="position:relative;display:none"><i class="ti ti-layout-dashboard"></i>Admin<span class="chek-notify" id="chekNotify"></span></button>
+    <button class="tab-btn" data-tab="profile" onclick="showTab('profile')"><i class="ti ti-user"></i>Profil</button>
   </nav>
 
   <!-- HOME -->
@@ -806,21 +806,6 @@ body{
           <div class="see-all">Barchasi</div>
         </div>
         <div class="orders-list" id="adminOrdersList">
-          <div class="order-row" onclick="openChek('Alisher K.','iPhone 16 Pro','18 500 000','5 daqiqa oldin','new')">
-            <div class="order-icon" style="background:rgba(245,91,91,0.1);color:var(--red);position:relative"><i class="ti ti-receipt"></i><span style="position:absolute;top:-3px;right:-3px;width:8px;height:8px;background:var(--red);border-radius:50%"></span></div>
-            <div class="order-info"><div class="order-name">Alisher K. — iPhone 16 Pro</div><div class="order-time">Chek yuborildi · 5 daqiqa oldin</div></div>
-            <div><div class="order-price">18.5M</div><div class="status-badge status-chek">Chek ✓</div></div>
-          </div>
-          <div class="order-row" onclick="openChek('Nilufar R.','AirPods Pro','2 800 000','23 daqiqa oldin','done')">
-            <div class="order-icon" style="background:rgba(34,216,126,0.1);color:var(--green)"><i class="ti ti-headphones"></i></div>
-            <div class="order-info"><div class="order-name">Nilufar R. — AirPods Pro</div><div class="order-time">23 daqiqa oldin</div></div>
-            <div><div class="order-price">2.8M</div><div class="status-badge status-done">Tasdiqlandi</div></div>
-          </div>
-          <div class="order-row" onclick="openChek('Bobur T.','MacBook Air','24 000 000','1 soat oldin','proc')">
-            <div class="order-icon" style="background:rgba(245,166,35,0.1);color:var(--orange)"><i class="ti ti-device-laptop"></i></div>
-            <div class="order-info"><div class="order-name">Bobur T. — MacBook Air</div><div class="order-time">1 soat oldin</div></div>
-            <div><div class="order-price">24M</div><div class="status-badge status-proc">Jarayon</div></div>
-          </div>
         </div>
       </div>
 
@@ -1353,6 +1338,7 @@ function loadData() {
       if(s.card?.owner)  CARD_OWNER  = s.card.owner;
       if(s.admin?.password) ADMIN_PASSWORD = s.admin.password;
       if(s.bot?.token) BOT_TOKEN = s.bot.token;
+      if(s.bot?.chatId) localStorage.setItem('ts_admin_chat_id', s.bot.chatId);
       updatePaymentCard();
       loadSettingsUI();
     }
@@ -1555,9 +1541,8 @@ function showTab(id) {
     const el = document.getElementById(t);
     if(el) el.classList.toggle('active', t===id);
   });
-  document.querySelectorAll('.tab-btn').forEach((btn,i) => {
-    const ids = ['home','cart','admin','profile'];
-    btn.classList.toggle('active', ids[i]===id);
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === id);
   });
   // detail actions fixed
   const actionsFixed = document.getElementById('detailActionsFixed');
@@ -1577,6 +1562,7 @@ function checkAdminPass() {
     document.getElementById('adminLock').style.display = 'none';
     document.getElementById('adminPassInput').value = '';
     document.getElementById('adminLockErr').textContent = '';
+    document.getElementById('adminTabBtn').style.display = 'flex';
   } else {
     document.getElementById('adminLockErr').textContent = '❌ Noto\'g\'ri parol';
     document.getElementById('adminPassInput').value = '';
@@ -1844,11 +1830,12 @@ function renderCart() {
   const subtotal = cart.reduce((s,c)=>s+c.price*c.qty,0);
   const itemsHtml = cart.map(c=>{
     const itemTotal = c.price * c.qty;
+    const prod = products.find(p=>p.id===c.id) || c;
     return `<div class="cart-item" data-id="${c.id}">
-      <div class="cart-item-img">${c.image?`<img src="${c.image}" alt="">`:c.emoji}</div>
+      <div class="cart-item-img">${prod.image?`<img src="${prod.image}" alt="">`:prod.emoji}</div>
       <div class="cart-item-info">
-        <div class="cart-item-brand">${c.brand}</div>
-        <div class="cart-item-name">${c.name}</div>
+        <div class="cart-item-brand">${prod.brand}</div>
+        <div class="cart-item-name">${prod.name}</div>
         <div class="cart-item-price">${formatPrice(itemTotal)}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1916,10 +1903,10 @@ async function proceedToPayment() {
   window._currentSuffix = suffix;
 
   // Payment ekranda summani ko'rsat
-  document.getElementById('paymentAmountDisplay').textContent = amount.toLocaleString('uz') + ' so\'m';
+  document.getElementById('paymentAmountDisplay').textContent = formatPrice(amount);
   const uBox = document.getElementById('uniqueAmountBox');
   if(uBox) {
-    document.getElementById('uniqueAmountVal').textContent = amount.toLocaleString('uz') + ' so\'m';
+    document.getElementById('uniqueAmountVal').textContent = formatPrice(amount);
   }
   showTab('payment');
 }
@@ -2099,7 +2086,7 @@ async function sendPayment() {
     <div class="sorder-row"><span>Buyurtma raqami</span><span style="color:var(--accent);font-weight:700">${orderNum}</span></div>
     <div class="sorder-row"><span>Manzil</span><span style="font-size:11px">${addr}</span></div>
     ${rows}
-    <div class="sorder-row"><span>To'langan summa</span><span style="color:var(--accent);font-weight:700">${uniqueAmt.toLocaleString('uz')} so'm</span></div>
+    <div class="sorder-row"><span>To'langan summa</span><span style="color:var(--accent);font-weight:700">${formatPrice(uniqueAmt)}</span></div>
     <div style="margin-top:8px;padding:10px;background:rgba(34,216,126,0.08);border-radius:12px;border:1px solid rgba(34,216,126,0.2);font-size:11px;color:var(--green);text-align:center">🤖 Bot to'lovni avtomatik tekshirmoqda...</div>`;
 
   addAdminOrder(orderNum, orderItems, uniqueAmt, tgUser, null, phone);
@@ -2154,14 +2141,14 @@ function showOrdersHistory() {
       const d = new Date(o.date);
       const dateStr = d.toLocaleDateString('uz-UZ');
       const itemsHtml = o.items.map(it=>`<div class="hist-item-row"><span>${it.emoji} ${it.name} x${it.qty}</span><span>${(it.price*it.qty/1000000).toFixed(1)}M</span></div>`).join('');
-      const statusColor = o.status==='Tasdiqlandi'?'var(--green)':o.status==='Rad etildi'?'var(--red)':'var(--orange)';
+      const statusColor = o.status.includes('Tasdiqlandi')?'var(--green)':o.status.includes('Rad etildi')?'var(--red)':'var(--orange)';
       return `<div class="hist-card">
         <div class="hist-header">
           <div><div class="hist-order-num">${o.num}</div><div class="hist-date">${dateStr} · ${o.addr}</div></div>
           <span class="status-badge" style="background:rgba(34,216,126,0.1);color:${statusColor}">${o.status}</span>
         </div>
         <div class="hist-items">${itemsHtml}</div>
-        <div class="hist-total"><span>Jami</span><span>${o.total.toLocaleString('uz')} so'm</span></div>
+        <div class="hist-total"><span>Jami</span><span>${formatPrice(o.total)}</span></div>
       </div>`;
     }).join('');
   }
@@ -2474,19 +2461,45 @@ function saveEditProduct() {
   p.price = parseInt(document.getElementById('editPrice').value) || p.price;
   p.discount = parseInt(document.getElementById('editDiscount').value) || 0;
   p.desc = document.getElementById('editDesc').value.trim() || p.desc;
-  if(editProdImages.length) {
-    p.images = [...editProdImages];
-    p.image = editProdImages[0];
+  
+  const hasImages = editProdImages.length > 0;
+  const tempImages = [...editProdImages];
+  
+  if(hasImages) {
+    p.images = [];
+    p.image = tempImages[0];
     p.emoji = null;
-    // Rasmlar allaqachon base64 da saqlangan
-  saveData();
   }
+  
   saveData();
   closeEditModal();
   filterProducts();
   renderAdminProducts();
   buildSlides();
   showToast('Mahsulot yangilandi','✓','var(--accent)');
+  
+  if(hasImages && tempImages.some(img => img.startsWith('data:'))) {
+    showToast('Rasmlar yuklanmoqda...', '⏳', 'var(--accent)');
+    let imageUrls = [];
+    Promise.all(tempImages.map((img, i) => {
+      if (img.startsWith('data:')) return uploadImageToFirebase(img, editingProdId, i);
+      return Promise.resolve(img);
+    })).then(urls => {
+      imageUrls = urls.filter(u => u);
+      if(imageUrls.length > 0) {
+        p.image = imageUrls[0];
+        p.images = imageUrls;
+        saveData();
+        filterProducts();
+        renderAdminProducts();
+        buildSlides();
+        showToast('Rasmlar saqlandi ✓', '🖼️', 'var(--green)');
+      }
+    }).catch(e => {
+      console.warn('Rasm yuklash xatosi:', e);
+      showToast('Rasm yuklashda xato!', '❌', 'var(--red)');
+    });
+  }
 }
 
 // ===== DELETE PRODUCT =====
@@ -2590,7 +2603,7 @@ function openChek(name, prod, price, time, status, userId, chekImg, userUsername
     '<span class="status-badge status-proc">Jarayon</span>';
   document.getElementById('chekInfo').innerHTML=`
     <div class="chek-row"><span>Mahsulot</span><span>${prod}</span></div>
-    <div class="chek-row"><span>Summa</span><span style="color:var(--accent);font-weight:700">${typeof price==='number'?price.toLocaleString('uz'):price} so'm</span></div>
+    <div class="chek-row"><span>Summa</span><span style="color:var(--accent);font-weight:700">${typeof price==='number'?formatPrice(price):price}</span></div>
     <div class="chek-row"><span>Vaqt</span><span>${time}</span></div>
     <div class="chek-row"><span>Holat</span><span>${statusHtml}</span></div>`;
   document.getElementById('chekActionsArea').innerHTML = `
@@ -2668,7 +2681,7 @@ async function rejectChek() {
 function buildChart() {
   initFirebase();
   if(!db) return;
-  const cb = document.getElementById('chartBars');
+  const cb = document.getElementById('adminStatsContent');
   if(!cb) return;
 
   // Statistika bo'limini Firebase dan real-time yangilash
@@ -2759,7 +2772,9 @@ function selectCatOption(selectId, value) {
   const label = sel.querySelector('[id$="Label"]') || sel.querySelector('.custom-select-trigger span');
   if(label) label.textContent = value;
   // update hidden input
-  const hiddenId = selectId === 'prodCatSelect' ? 'prodCat' : 'addrCity';
+  let hiddenId = '';
+  if(selectId === 'prodCatSelect') hiddenId = 'prodCat';
+  else if(selectId === 'addrCitySelect') hiddenId = 'addrCity';
   const hidden = document.getElementById(hiddenId);
   if(hidden) hidden.value = value;
   // mark selected option
@@ -3094,7 +3109,11 @@ function applyIconFallback() {
     el.dataset.iconApplied = '1';
     el.innerHTML = SVG_ICONS[name];
     const svg = el.querySelector('svg');
-    if(svg) { svg.style.cssText='width:1em;height:1em;display:block;stroke:currentColor;'; }
+    if(svg) {
+      svg.style.width = '1em';
+      svg.style.height = '1em';
+      svg.style.display = 'block';
+    }
   });
 }
 
