@@ -94,9 +94,9 @@ const bot = new Telegraf(BOT_TOKEN);
 bot.start((ctx) => {
   const name = ctx.from.first_name || 'Mehmon';
   return ctx.reply(
-    `Salom, ${name}! TechStore'ga xush kelibsiz!\nEng so'nggi texnologiyalarni qulay narxlarda toping.`,
+    `Salom, ${name}! 👋\n\nTechStore rasmiy botiga xush kelibsiz!\nEng yangi texnologiyalar va aksessuarlarni ko'rish uchun pastdagi tugmani bosing.`,
     Markup.inlineKeyboard([
-      [Markup.button.webApp("Do'konni ochish", WEBAPP_URL)],
+      [Markup.button.webApp("🛍 Do'konni ochish", WEBAPP_URL)],
     ])
   );
 });
